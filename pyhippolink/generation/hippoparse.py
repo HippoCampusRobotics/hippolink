@@ -28,7 +28,6 @@ class HippoType(object):
         self.ordered_fieldtypes = []
         self.fieldnames = []
         self.ordered_fieldnames = []
-        self.needs_pack = False
         self.wire_length = 0
         self.field_offsets = {}
 
@@ -65,11 +64,6 @@ class HippoType(object):
             field.wire_offset = self.wire_length
             self.field_offsets[field.name] = field.wire_offset
             self.wire_length += field.wire_length
-            field_elem_length = field.wire_length
-            if field.array_length > 1:
-                field_elem_length = field.wire_length / field.array_length
-            if field.wire_offset % field_elem_length != 0:
-                self.needs_pack = True
             self.ordered_fieldnames.append(field.name)
             self.ordered_fieldtypes.append(field.type)
 
