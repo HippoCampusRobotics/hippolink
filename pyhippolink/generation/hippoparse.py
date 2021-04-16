@@ -30,7 +30,6 @@ class HippoType(object):
         self.ordered_fieldnames = []
         self.needs_pack = False
         self.wire_length = 0
-        self.wire_min_length = 0
         self.field_offsets = {}
 
     def sort_fields(self):
@@ -71,7 +70,6 @@ class HippoType(object):
                 field_elem_length = field.wire_length / field.array_length
             if field.wire_offset % field_elem_length != 0:
                 self.needs_pack = True
-            self.wire_min_length = self.wire_length
             self.ordered_fieldnames.append(field.name)
             self.ordered_fieldtypes.append(field.type)
 
@@ -156,7 +154,6 @@ class HippoXml(object):
             self.p.EndElementHandler = self.end_element
             self.p.ParseFile(f)
         self.message_lenghts = {}
-        self.message_min_lenghts = {}
         self.message_crcs = {}
         self.message_names = {}
         self.largest_payload = 0
@@ -167,7 +164,6 @@ class HippoXml(object):
             key = msg.id
             self.message_crcs[key] = msg.crc_extra
             self.message_lenghts[key] = msg.wire_length
-            self.message_min_lenghts[key] = msg.wire_min_length
             self.message_names[key] = msg.name
             if msg.wire_length > self.largest_payload:
                 self.largest_payload = msg.wire_length
