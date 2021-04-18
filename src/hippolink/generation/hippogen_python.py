@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import textwrap
+from yapf.yapflib.yapf_api import FormatFile
 
 
 def generate_preamble(f):
@@ -42,7 +43,9 @@ class HippoLinkHeader(object):
         self.msg_id = msg_id
 
     def pack(self):
-        return struct.pack("<BBBB", self.msg_len, self.seq, self.node_id, self.msg_id)
+        return struct.pack("<BBBB", self.msg_len, self.seq, self.node_id,
+            self.msg_id)
+
 
 class HippoLinkMessage(object):
     def __init__(self, msg_id, name):
@@ -58,21 +61,21 @@ class HippoLinkMessage(object):
         if isinstance(raw_attr, bytes):
             raw_attr = to_string(raw_attr).rstrip("\\00")
         return raw_attr
-    
+
     def get_msg_buffer(self):
         if isinstance(self._msg_buffer, bytearray):
             return self._msg_buffer
         return bytearray(self._msg_buffer)
-    
+
     def get_header(self):
         return self._header
 
     def get_payload(self):
         return self._payload
-    
+
     def get_crc(self):
         return self._crc
-    
+
     def get_fieldnames(self):
         return self._fieldnames
 
@@ -110,7 +113,7 @@ class HippoLinkMessage(object):
         if self.get_node_id() != other.node_id():
             return False
         for name in self._fieldnames:
-            if self.format_attr(name) != other.format_attr(a):
+            if self.format_attr(name) != other.format_attr(name):
                 return False
         return True
 
@@ -133,21 +136,21 @@ class HippoLinkMessage(object):
         while n > 1 and payload[n-1] == nullbyte:
             n -= 1
         self._payload = payload[:n]
-        self._header = HippoLinkHeader(msg_id=self._header.msg_id, msg_len=len(self._payload), seq=hippo.seq, node_id=hippo.node_id)
+        self._header = HippoLinkHeader(msg_id=self._header.msg_id,
+            msg_len=len(self._payload), seq=hippo.seq, node_id=hippo.node_id)
         self._msg_buffer = self._header.pack() + self._payload
         crc = x25crc(self._msg_buffer)
         crc.accumulate_str(self._msg_buffer)
         self.crc = crc.crc
-        self._msgbuf += struct.pack("<H", self._crc)
-        return self._msgbuf
+        self._msg_buffer += struct.pack("<H", self._crc)
+        return self._msg_buffer
 
     def __getitem(self, key):
         if self._instances is None:
             raise IndexError()
         if key not in self._instances:
             raise IndexError()
-        return self._instances[key]
-""")
+        return self._instances[key]\n""")
 
 
 def byname_hash_from_field_attribute(msg, attribute):
@@ -204,7 +207,7 @@ class {classname}(HippoLinkMessage):
     array_lengths = {array_len_map}
     crc_extra = {crc_extra}
     unpacker = struct.Struct('{fmtstr}')
-    
+
     def __init__(self""".format(
             classname=classname,
             description=wrapper.fill(msg.description.strip()),
@@ -235,7 +238,8 @@ class {classname}(HippoLinkMessage):
             f.write("        self.{name} = {name}\n".format(name=field.name))
         f.write("""
     def pack(self, hippo):
-        return HippoLinkMessage.pack(self, hippo, {crc_extra}, struct.pack('{fmtstr}'"""
+        return HippoLinkMessage.pack(self, hippo, {crc_extra},
+            struct.pack('{fmtstr}'"""
                 .format(crc_extra=msg.crc_extra, fmtstr=msg.fmtstr))
         for field in msg.ordered_fields:
             if field.type != "char" and field.array_length > 1:
@@ -278,6 +282,153 @@ def hippodefault(field):
     return "[" + ", ".join([default_value] * field.array_length) + "]"
 
 
+def geberate_hippolink(f, msgs, xml):
+    f.write("\n\nHIPPOLINK_MAP = {\n")
+    for msg in msgs:
+        f.write("    HIPPOLINK_MSG_ID_{} : HippoLink_{}_message,\n".format(
+            msg.name.upper(), msg.name.lower()))
+    f.write("}\n\n")
+
+    f.write("""
+class HippoLinkError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+        self.message = msg
+
+
+class HippoLink_bad_data(HippoLink_message):
+    def __init__(self, data, reason):
+        super(HippoLink_bad_data, self).__init__(self,
+            HIPPOLINK_MSG_ID_BAD_DATA, "BAD_DATA")
+        self._fieldnames = ["data", "reason"]
+        self.data = data
+        self.reason = reason
+        self._msg_buffer = data
+
+
+class HippoLink(object):
+    def __init__(self, file, node_id):
+        self.seq = 0
+        self.file = file
+        self.node_id = node_id
+        self.send_callback = None
+        self.send_callback_args = None
+        self.send_callback_kwargs = None
+        self.buffer = bytearray()
+        self.buffer_index = 0
+        self.link_stats = dict(bytes_sent=0,
+                               packets_sent=0,
+                               bytes_received=0,
+                               packets_received=0,
+                               receive_errors=0)
+        self.header_unpacker = struct.Struct("<BBBB")
+        self.crc_unpacker = struct.Struct("<H")
+
+    def set_send_callback(self, callback, *args, **kwargs):
+        self.send_callback = callback
+        self.send_callback_args = args
+        self.send_callback_kwargs = kwargs
+
+    def _update_link_stats_sent(self, msg_len):
+        self.link_stats["bytes_sent"] += msg_len
+        self.link_stats["packets_sent"] += 1
+
+    def _update_link_stats_received(self, msg_len):
+        self.link_stats["bytes_received] += msg_len
+        self.link_status["packets_received"] += 1
+
+    def send(self, msg):
+        buffer = msg.pack(self)
+        self.file.write(buffer)
+        self.seq = (self.seq + 1) if self.seq < 255 else 0
+        self._update_link_stats_sent(self, len(buffer))
+        if self.send_callback:
+            self.send_callback(msg,
+                               *self.send_callback_args,
+                               **self.send_callback_kwargs)
+
+    def decode(self, msg_buffer):
+        header_len = 4
+        crc_len = 2
+        try:
+            msg_len, seq, node_id, msg_id = self.header_unpacker.unpack(
+                msg_buffer[:header_len])
+        except struct.error as e:
+            raise HippoLinkError(
+                "Unable to unpack HippoLink header: {{}}".format(e))
+
+        payload_len = len(msg_buffer) - (header_len + crc_len)
+        if msg_len != payload_len:
+            raise HippoLinkError(
+                "Invalid HippoLink message length(msg_id={{}}). Got {{}} but "
+                "expected {}.".format(msg_id, payload_len, msg_len))
+        if msg_id not in HIPPOLINK_MAP:
+            raise HippoLinkError("Unknown message ID {{}}".format(msg_id))
+
+        msg_type = HIPPOLINK_MAP[msg_id]
+        fmt = msg_type.format
+        order_map = msg_type.orders
+        len_map = msg_type.lengths
+        crc_extra = msg_type.crc_extra
+
+        try:
+            crc, = self.crc_unpacker.unpack(msg_buffer[-crc_len:])
+        except struct.error as e:
+            raise HippoLinkError("Unable to unpack CRC: {{}}".format(e))
+        crc_buffer = msg_buffer[:-crc_len]
+        crc_buffer.append(crc_extra)
+        crc_check = x25crc(crc_buffer)
+        if crc != crc_check.crc:
+            raise HippoLinkError("Invalid CRC(msg_id={{}}) is 0x{{:04x}} but "
+                "should be 0x{{:04x}}.".format(msg_id, crc, crc_check.crc))
+
+        csize = msg_type.unpacker.size
+        payload_buffer = msg_buffer[header_len:-crc_len]
+        if len(payload_buffer) < csize:
+            payload_buffer.extend([0] * (csize - len(payload_buffer)))
+        payload_buffer = payload_buffer[:csize]
+        try:
+            fields = msg_type.unpacker.unpack(payload_buffer)
+        except struct.error as e:
+            raise HippoLinkError("Unable to unpack payload (type={{}}, "
+                "fmt={{}}, payload_len={{}}): {}".format(
+                    msg_type, fmt, len(payload_buffer), e))
+
+        fieldlist = list(fields)
+        fields = fieldlist[:]
+        if sum(len_map) == len(len_map):
+            # message has no arrays
+            for i in range(len(fieldlist)):
+                fieldlist[i] = t[order_map[i]]
+        else:
+            fieldlist = []
+            for i in range(len(order_map)):
+                order = order_map[i]
+                L = len_map[order]
+                tip = sum(len_map[:order])
+                field = fields[tip]
+                if L == 1 or isinstance(field, str):
+                    fieldlist.append(field)
+                else:
+                    fieldlist.append(fields[tip:tip+L])
+
+        # TODO: handle strings
+
+        fields = tuple(fieldlist)
+        try:
+            msg = msg_type(*fields)
+        except Exception as e:
+            raise HippoLinkError("Unable to instantiate HippoLink message: "
+                "{{}}".format(e))
+        msg._msg_buffer = msg_buffer
+        msg._payload = msg_buffer[header_len:-crc_len]
+        msg._crc = crc
+        msg._header = HippoLinkHeader(msg_id=msg_id, msg_len=msg_len, seq=seq,
+            node_id=node_id)
+        return msg
+    """)
+
+
 def generate(xml, out_path):
     filename = out_path
     msgs = []
@@ -301,3 +452,4 @@ def generate(xml, out_path):
         generate_preamble(f)
         generate_message_ids(f, msgs)
         generate_classes(f, msgs)
+    FormatFile(filename, in_place=True)
