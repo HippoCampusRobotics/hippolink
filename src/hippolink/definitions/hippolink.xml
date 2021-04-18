@@ -4,9 +4,9 @@
 
         <message id="0" name="POSE">
             <description>Some super cool description</description>
-            <field type="float" name="x" unit="m">X Position</field>
-            <field type="float" name="y" unit="m">Y Position</field>
-            <field type="float" name="z" unit="m">Z Position</field>
+            <field type="float" name="x" units="m">X Position</field>
+            <field type="float" name="y" units="m">Y Position</field>
+            <field type="float" name="z" units="m">Z Position</field>
             <field type="float" name="qx">X component of quaternion</field>
             <field type="float" name="qy">Y component of quaternion</field>
             <field type="float" name="qz">Z component of quaternion</field>

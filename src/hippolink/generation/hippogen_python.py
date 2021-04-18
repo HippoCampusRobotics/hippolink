@@ -10,7 +10,7 @@ def generate_preamble(f):
 from __future__ import print_function
 import struct
 import json
-from pyhippolink.generation.crc import x25crc
+from hippolink.crc import x25crc
 
 def to_string(s):
     try:
@@ -35,7 +35,7 @@ def to_string(s):
     return r+ "_XXX"
 
 class HippoLinkHeader(object):
-    def __init__(self, msg_idid, msg_len=0, seq=0, node_id=0):
+    def __init__(self, msg_id, msg_len=0, seq=0, node_id=0):
         self.msg_len = msg_len
         self.seq = seq
         self.node_id = node_id
@@ -278,8 +278,8 @@ def hippodefault(field):
     return "[" + ", ".join([default_value] * field.array_length) + "]"
 
 
-def generate(xml):
-    filename = "test.py"
+def generate(xml, out_path):
+    filename = out_path
     msgs = []
     for x in xml:
         msgs.extend(x.message)

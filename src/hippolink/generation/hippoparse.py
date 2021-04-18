@@ -4,7 +4,7 @@ import operator
 
 
 def message_crc(msg):
-    from .crc import x25crc
+    from ..crc import x25crc
     crc = x25crc()
     crc.accumulate_str(msg.name + " ")
     for field in msg.ordered_fields:
@@ -146,8 +146,9 @@ class HippoXml(object):
             self.p = xml.parsers.expat.ParserCreate()
             self.p.StartElementHandler = self.start_element
             self.p.EndElementHandler = self.end_element
+            self.p.CharacterDataHandler = self.element_text
             self.p.ParseFile(f)
-        self.message_lenghts = {}
+        self.message_lengths = {}
         self.message_crcs = {}
         self.message_names = {}
         self.largest_payload = 0
@@ -157,11 +158,10 @@ class HippoXml(object):
             msg.update_all_field_properties()
             key = msg.id
             self.message_crcs[key] = msg.crc_extra
-            self.message_lenghts[key] = msg.wire_length
+            self.message_lengths[key] = msg.wire_length
             self.message_names[key] = msg.name
             if msg.wire_length > self.largest_payload:
                 self.largest_payload = msg.wire_length
-
 
     def check_attrs(self, attrs, check, where):
         for c in check:
@@ -193,3 +193,10 @@ class HippoXml(object):
 
     def end_element(self, name):
         self.in_element_list.pop()
+
+    def element_text(self, text):
+        in_element = ".".join(self.in_element_list)
+        if in_element == "hippolink.messages.message.description":
+            self.message[-1].description += text
+        elif in_element == "hippolink.messages.message.field":
+            self.message[-1].fields[-1].description += text
