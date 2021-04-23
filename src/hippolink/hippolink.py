@@ -1,8 +1,8 @@
 import struct
 
-from hippolink import msgs
-from hippolink import cobs
-from hippolink.crc import x25crc
+from . import msgs
+from . import cobs
+from .crc import x25crc
 
 
 class HippoLinkError(Exception):
@@ -14,11 +14,14 @@ class HippoLinkError(Exception):
 class HippoLink_bad_data(msgs.HippoLinkMessage):
     def __init__(self, data, reason):
         super(HippoLink_bad_data,
-              self).__init__(self, msgs.HIPPOLINK_MSG_ID_BAD_DATA, "BAD_DATA")
+              self).__init__(msgs.HIPPOLINK_MSG_ID_BAD_DATA, "BAD_DATA")
         self._fieldnames = ["data", "reason"]
         self.data = data
         self.reason = reason
         self._msg_buffer = data
+
+    def __str__(self):
+        return '%s {%s, data:%s}' % (self._type, self.reason, [('%x' % ord(i) if isinstance(i, str) else '%x' % i) for i in self.data])
 
 
 class HippoLink(object):
@@ -52,7 +55,7 @@ class HippoLink(object):
 
     def _update_link_stats_received(self, msg_len):
         self.link_stats["bytes_received"] += msg_len
-        self.link_status["packets_received"] += 1
+        self.link_stats["packets_received"] += 1
 
     def _update_link_stats_errors(self):
         self.link_stats["receive_errors"] += 1
@@ -151,8 +154,8 @@ class HippoLink(object):
         return msg
 
     def recv_msg(self):
-        data = self.port.read_until(expected=0)
-        if not data or data[-1] != 0:
+        data = self.port.read_until(expected=bytearray([0, ]))
+        if not data or data[-1] != 0 or len(data) < self.crc_len + self.header_len + 2:
             return None
         data = cobs.decode(data)
         if len(data) < self.header_len + self.crc_len:
