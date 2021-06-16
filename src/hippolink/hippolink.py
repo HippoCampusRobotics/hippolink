@@ -26,7 +26,6 @@ class HippoLink_bad_data(msgs.HippoLinkMessage):
 
 class HippoLink(object):
     def __init__(self, port, node_id):
-        self.seq = 0
         self.port = port
         self.node_id = node_id
         self.send_callback = None
@@ -39,7 +38,7 @@ class HippoLink(object):
                                bytes_received=0,
                                packets_received=0,
                                receive_errors=0)
-        self.header_unpacker = struct.Struct("<BBBB")
+        self.header_unpacker = struct.Struct("<BBB")
         self.crc_unpacker = struct.Struct("<H")
         self.header_len = self.header_unpacker.size
         self.crc_len = self.crc_unpacker.size
@@ -64,8 +63,7 @@ class HippoLink(object):
         packed_msg = msg.pack(self)
         encoded_msg = cobs.encode(packed_msg)
         self.port.write(encoded_msg)
-        self.seq = (self.seq + 1) if self.seq < 255 else 0
-        self._update_link_stats_sent(self, len(encoded_msg))
+        self._update_link_stats_sent(len(encoded_msg))
         if self.send_callback:
             self.send_callback(msg, *self.send_callback_args,
                                **self.send_callback_kwargs)
@@ -74,7 +72,7 @@ class HippoLink(object):
         header_len = self.header_len
         crc_len = self.crc_len
         try:
-            msg_len, seq, node_id, msg_id = self.header_unpacker.unpack(
+            msg_len, node_id, msg_id = self.header_unpacker.unpack(
                 msg_buffer[:header_len])
         except struct.error as e:
             raise HippoLinkError(
@@ -149,7 +147,6 @@ class HippoLink(object):
         msg._crc = crc
         msg._header = msgs.HippoLinkHeader(msg_id=msg_id,
                                            msg_len=msg_len,
-                                           seq=seq,
                                            node_id=node_id)
         return msg
 

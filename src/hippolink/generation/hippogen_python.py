@@ -36,14 +36,13 @@ def to_string(s):
     return r+ "_XXX"
 
 class HippoLinkHeader(object):
-    def __init__(self, msg_id, msg_len=0, seq=0, node_id=0):
+    def __init__(self, msg_id, msg_len=0, node_id=0):
         self.msg_len = msg_len
-        self.seq = seq
         self.node_id = node_id
         self.msg_id = msg_id
 
     def pack(self):
-        return struct.pack("<BBBB", self.msg_len, self.seq, self.node_id,
+        return struct.pack("<BBB", self.msg_len, self.node_id,
             self.msg_id)
 
 
@@ -88,9 +87,6 @@ class HippoLinkMessage(object):
     def get_node_id(self):
         return self._header.node_id
 
-    def get_seq(self):
-        return self._header.seq
-
     def __str__(self):
         ret = "%s {" % self._type
         for name in self._fieldnames:
@@ -106,9 +102,6 @@ class HippoLinkMessage(object):
         if other is None:
             return False
         if self.get_type() != other.get_type():
-            return False
-
-        if self.get_seq() != other.get_seq():
             return False
         if self.get_node_id() != other.node_id():
             return False
@@ -137,7 +130,7 @@ class HippoLinkMessage(object):
             n -= 1
         self._payload = payload[:n]
         self._header = HippoLinkHeader(msg_id=self._header.msg_id,
-            msg_len=len(self._payload), seq=hippo.seq, node_id=hippo.node_id)
+            msg_len=len(self._payload), node_id=hippo.node_id)
         self._msg_buffer = self._header.pack() + self._payload
         crc = x25crc(self._msg_buffer)
         crc.accumulate_str(struct.pack("B", crc_extra))

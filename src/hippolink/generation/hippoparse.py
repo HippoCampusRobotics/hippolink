@@ -1,6 +1,7 @@
 import os
 import xml.parsers.expat
 import operator
+import re
 
 
 def message_crc(msg):
@@ -15,7 +16,22 @@ def message_crc(msg):
     return (crc.crc & 0xFF) ^ (crc.crc >> 8)
 
 
-class HippoType(object):
+TYPE_LENGTHS = dict(
+    float=4,
+    double=8,
+    char=1,
+    int8_t=1,
+    uint8_t=1,
+    int16_t=2,
+    uint16_t=2,
+    int32_t=4,
+    uint32_t=4,
+    int64_t=8,
+    uint64_t=8,
+)
+
+
+class HippoMessageType(object):
     def __init__(self, name, id, linenumber, description=""):
         self.name = name
         self.name_lower = name.lower()
@@ -92,6 +108,7 @@ class HippoField(object):
         self.name = name
         self.name_upper = name.upper()
         self.description = description
+        # if this field is an array, this attribute declares its length
         self.array_length = 0
         self.enum = enum
         self.display = display
@@ -99,40 +116,45 @@ class HippoField(object):
         self.omit_arg = False
         self.const_value = None
         self.print_format = print_format
-        lengths = dict(
-            float=4,
-            double=8,
-            char=1,
-            int8_t=1,
-            uint8_t=1,
-            int16_t=2,
-            uint16_t=2,
-            int32_t=4,
-            uint32_t=4,
-            int64_t=8,
-            uint64_t=8,
-        )
 
-        idx = type.find("[")
-        if idx != -1:
-            assert type[-1:] == "]"
-            self.array_length = int(type[idx + 1:-1])
-            type = type[:idx]
-            if type == "array":
-                type = "int8_t"
-        if type in lengths:
-            self.type_length = lengths[type]
+        self._parse_type(type)
+        self.type_upper = self.type.upper()
+
+    def _parse_type(self, type):
+        if self._type_is_array(type):
+            self._parse_array(type)
+        else:
+            self._parse_non_array(type)
+
+    def _type_is_array(self, type):
+        return bool("[" in type)
+
+    def _parse_array(self, type):
+        m = re.search(r"([a-zA-Z0-9]+?)\[(0-9+)\]", type)
+        if not m:
+            raise Exception("Could not parse type: '{}'".format(type))
+        type = m.group(1)
+        length = m.group(2)
+        if type in TYPE_LENGTHS:
             self.type = type
-        elif (type + "_t") in lengths:
-            self.type_length = lengths[type + "_t"]
+        elif (type + "_t") in TYPE_LENGTHS:
             self.type = type + "_t"
         else:
-            raise Exception()
-        if self.array_length != 0:
-            self.wire_length = self.array_length * self.type_length
+            raise Exception("Unknown type: '{}'".format(type))
+        self.type_length = TYPE_LENGTHS[self.type]
+        self.array_length = length
+        self.wire_length = self.array_length * self.type_length
+
+    def _parse_non_array(self, type):
+        if type in TYPE_LENGTHS:
+            self.type = type
+        elif (type + "_t") in TYPE_LENGTHS:
+            self.type = type + "_t"
         else:
-            self.wire_length = self.type_length
-        self.type_upper = self.type.upper()
+            raise Exception("Unknown type: '{}'".format(type))
+        self.type_length = TYPE_LENGTHS[self.type]
+        self.array_length = 0
+        self.wire_length = self.type_length
 
 
 class HippoXml(object):
@@ -176,8 +198,8 @@ class HippoXml(object):
         if in_element == "hippolink.messages.message":
             self.check_attrs(attrs, ["name", "id"], "message")
             self.message.append(
-                HippoType(attrs["name"], attrs["id"],
-                          self.p.CurrentLineNumber))
+                HippoMessageType(attrs["name"], attrs["id"],
+                                 self.p.CurrentLineNumber))
         elif in_element == "hippolink.messages.message.field":
             self.check_attrs(attrs, ["name", "type"], "field")
             print_format = attrs.get("print_format", None)
