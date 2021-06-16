@@ -38,7 +38,8 @@ setup(
     # scripts=["scripts/hippogen.py"],
     install_requires=[
         "future",
-        "pyserial"
+        "pyserial",
+        "yapf",
     ],
     cmdclass={"build_py": custom_build_py},
 )
