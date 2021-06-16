@@ -42,6 +42,7 @@ class HippoLink(object):
         self.crc_unpacker = struct.Struct("<H")
         self.header_len = self.header_unpacker.size
         self.crc_len = self.crc_unpacker.size
+        self.min_msg_len = self.crc_len + self.header_len + 2
 
     def set_send_callback(self, callback, *args, **kwargs):
         self.send_callback = callback
@@ -152,7 +153,7 @@ class HippoLink(object):
 
     def recv_msg(self):
         data = self.port.read_until(expected=bytearray([0, ]))
-        if not data or data[-1] != 0 or len(data) < self.crc_len + self.header_len + 2:
+        if not data or data[-1] != 0 or len(data) < self.min_msg_len:
             return None
         data = cobs.decode(data)
         if len(data) < self.header_len + self.crc_len:
