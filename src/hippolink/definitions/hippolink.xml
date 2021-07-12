@@ -18,5 +18,22 @@
             <field type="uint8_t" name="rssi">The RSSI value of the radio that is sending this message.</field>
             <field type="uint8_t" name="noise">RSSI value of the local background noise.</field>
         </message>
+        <message id="3" name="PATH_TARGET">
+            <field type="float" name="x" units="m">Target Position X</field>
+            <field type="float" name="y" units="m">Target Position Y</field>
+            <field type="float" name="z" units="m">Target Position Z</field>
+            <field type="uint32_t" name="index">Path index of current target</field>
+        </message>
+        <message id="4" name="POSE_2D_MIN">
+            <description>2D pose with very small memory usage.</description>
+            <field type="int16_t" name="x" units="mm">X position.</field>
+            <field type="int16_t" name="y" units="mm">Y position.</field>
+            <field type="int16_t" name="yaw" units="mrad">Yaw angle</field>
+        </message>
+        <message id="5" name="PATH_TARGET_2D_MIN">
+            <field type="int16_t" name="x" units="mm">X position.</field>
+            <field type="int16_t" name="y" units="mm">Y position.</field>
+            <field type="uint32_t" name="index">Path index of current target.</field>
+        </message>
     </messages>
 </hippolink>
